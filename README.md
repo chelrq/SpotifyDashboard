@@ -35,7 +35,7 @@ A web application that creates personalized analytics dashboards for Spotify use
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/)
 2. Create a new app
-3. Add `http://127.0.0.1:5000/callback/` to Redirect URIs in your dashboard settings
+3. Add `http://127.0.0.1:5000/api/callback/` to Redirect URIs in your dashboard settings
 4. Save your `Client ID` and `Client Secret`
 5. Adding any other users require manual set up in User Management tab
 
