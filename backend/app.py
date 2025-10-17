@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect, session
+from flask import Flask, request, jsonify, redirect, session, send_from_directory
 from flask_cors import CORS
 import spotipy
 from spotipy import Spotify
@@ -11,13 +11,13 @@ import json
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', os.urandom(64).hex())
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=['http://127.0.0.1:5000'])
 
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'https://127.0.0.1:5000/callback/')
+SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'http://127.0.0.1:5000/api/callback/')
 
 SCOPE = 'user-top-read user-read-recently-played user-library-read playlist-read-private'
 
@@ -47,20 +47,14 @@ sp = Spotify(auth_manager = sp_oauth )
 
 @app.route('/')
 def index():
-    return f'''
-    <html>
-    <head><title>Spotify Dashboard</title></head>
-    <body>
-        <h1>🎵 Spotify Dashboard API</h1>
-        <p><strong>Status:</strong> Running ✅</p>
-        <p><strong>Credentials:</strong> {"Configured ✅" if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET else "Missing ❌"}</p>
-        
-        <h2>Test the OAuth:</h2>
-        <p><a href="/login" style="background: #1db954; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Login with Spotify</a></p>
+    return send_from_directory(app.static_folder, 'index.html')
 
-    </body>
-    </html>
-    '''
+@app.route('/<path:path>')
+def serve_static(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/debug')
 def debug_info():
@@ -94,34 +88,41 @@ def login():
 
 @app.route('/callback')
 @app.route('/callback/')
+@app.route('/api/callback')
+@app.route('/api/callback/')
 def callback():
     try:
         code = request.args.get('code')
         error = request.args.get('error')
-        
+
         if error:
             print(f"Spotify OAuth error: {error}")
-            return f'<h1>Spotify OAuth Error: {error}</h1><p><a href="/">Try again</a></p>'
-        
+            return redirect(f'/?error={error}')
+
         if not code:
             print("No authorization code received from Spotify")
-            return '<h1>No authorization code received</h1><p><a href="/">Try again</a></p>'
-        
+            return redirect('/?error=no_code')
+
         session.clear()
-        
-        print(f"Getting access token with code: {code}")
-        token_info = sp_oauth.get_access_token(code)
-        
+
+        token_info = sp_oauth.get_access_token(code, check_cache=False)
+
         if not token_info:
             print("Failed to get token from Spotify")
-            return '<h1>Failed to get token from Spotify</h1><p><a href="/">Try again</a></p>'
-            
+            return redirect('/?error=no_token')
+
         session['token_info'] = token_info
         print("Successfully authenticated with Spotify!")
-        return '<h1>✅ Success! Spotify Authentication Complete</h1><p>You can now test the API endpoints:</p><ul><li><a href="/api/user">Get User Info</a></li><li><a href="/api/top-tracks">Get Top Tracks</a></li><li><a href="/api/top-artists">Get Top Artists</a></li></ul>'
-        
+        return redirect('/?success=true')
+
     except Exception as e:
-        print(f"Callback error: {e}")
+        print(f"Callback error occurred")
+        return redirect('/?error=callback_error')
+
+@app.route('/api/auth-status')
+def auth_status():
+    token_info = get_token()
+    return jsonify({'authenticated': token_info is not None})
 
 @app.route('/api/user')
 def get_user():
@@ -223,21 +224,108 @@ def get_recent_tracks():
                 'artist': ', '.join([artist['name'] for artist in track['artists']]),
                 'album': track['album']['name'],
                 'duration_ms': track['duration_ms'],
-                'image': track['album']['images'][0]['url'] if track['album']['images'] else None
+                'image': track['album']['images'][0]['url'] if track['album']['images'] else None,
+                'external_url': track['external_urls']['spotify']
             })
         
         return jsonify({'tracks': tracks})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
+@app.route('/api/recommendations')
+def get_recommendations():
     try:
-        print("Starting Flask server")
-        print("Note: You'll see a browser security warning - click 'Advanced' -> 'Proceed to localhost (unsafe)'")
-        app.run(debug=True, port=5000, ssl_context='adhoc', host='127.0.0.1')
-    except ImportError as e:
-        print(f"ERROR: Missing SSL dependency: {e}")
-        exit(1)
+        token_info = get_token()
+        if not token_info:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+
+        # Get seed tracks/artists from query params or use top items
+        seed_tracks = request.args.get('seed_tracks', '').split(',') if request.args.get('seed_tracks') else []
+        seed_artists = request.args.get('seed_artists', '').split(',') if request.args.get('seed_artists') else []
+        seed_genres = request.args.get('seed_genres', '').split(',') if request.args.get('seed_genres') else []
+        limit = int(request.args.get('limit', 20))
+
+        # If no seeds provided, try to get top tracks or artists
+        if not seed_tracks and not seed_artists and not seed_genres:
+            # Try short term first
+            top_tracks = sp.current_user_top_tracks(limit=5, time_range='short_term')
+
+            if top_tracks['items']:
+                seed_tracks = [track['id'] for track in top_tracks['items'][:5]]
+            else:
+                # If no short term, try medium term
+                top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
+                if top_tracks['items']:
+                    seed_tracks = [track['id'] for track in top_tracks['items'][:5]]
+                else:
+                    # If still no tracks, try top artists
+                    top_artists = sp.current_user_top_artists(limit=5, time_range='medium_term')
+                    if top_artists['items']:
+                        seed_artists = [artist['id'] for artist in top_artists['items'][:5]]
+                    else:
+                        # Last resort: use popular genres
+                        seed_genres = ['pop', 'rock', 'indie']
+
+        # Filter out empty strings from seeds
+        seed_tracks = [t for t in seed_tracks if t]
+        seed_artists = [a for a in seed_artists if a]
+        seed_genres = [g for g in seed_genres if g]
+
+        # Make sure we have at least one seed
+        if not seed_tracks and not seed_artists and not seed_genres:
+            return jsonify({'error': 'Unable to generate recommendations. Please listen to more music on Spotify first!'}), 400
+
+        # Get recommendations
+        results = sp.recommendations(
+            seed_tracks=seed_tracks[:5] if seed_tracks else None,
+            seed_artists=seed_artists[:5] if seed_artists else None,
+            seed_genres=seed_genres[:5] if seed_genres else None,
+            limit=limit
+        )
+
+        recommendations = []
+        for track in results['tracks']:
+            recommendations.append({
+                'id': track['id'],
+                'name': track['name'],
+                'artist': ', '.join([artist['name'] for artist in track['artists']]),
+                'album': track['album']['name'],
+                'popularity': track['popularity'],
+                'duration_ms': track['duration_ms'],
+                'image': track['album']['images'][0]['url'] if track['album']['images'] else None,
+                'external_url': track['external_urls']['spotify'],
+                'preview_url': track.get('preview_url')
+            })
+
+        return jsonify({'recommendations': recommendations})
     except Exception as e:
-        print(f"Failed to start HTTPS server: {e}")
-        exit(1)
+        print(f"Recommendations error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/genre-seeds')
+def get_genre_seeds():
+    try:
+        token_info = get_token()
+        if not token_info:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        genres = sp.recommendation_genre_seeds()
+
+        return jsonify({'genres': genres['genres']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    import logging
+    from werkzeug.serving import run_simple
+
+    # Suppress Flask/Werkzeug request logs
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+
+    print("Starting Flask server on http://127.0.0.1:5000")
+    print("Open http://127.0.0.1:5000 in your browser")
+    run_simple('127.0.0.1', 5000, app, use_reloader=True, use_debugger=False)

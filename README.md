@@ -1,6 +1,6 @@
 # Spotify Dashboard
 
-A web application that creates personalized analytics dashboards for Spotify users, showing their most listened to songs, total listening time, top artists, and other analytics.
+A web application that creates personalized analytics dashboards for Spotify users, showing their top songs, top artists, and other analytics.
 
 ## Tech Stack
 
@@ -8,7 +8,6 @@ A web application that creates personalized analytics dashboards for Spotify use
 - **Python Flask**: Web server and API endpoints
 - **Spotipy**: Spotify Web API integration
 - **Pandas**: Data analysis and processing
-- **SQLite**: Database for caching user data
 - **Flask-CORS**: Cross-origin resource sharing
 
 ### Frontend
@@ -21,58 +20,123 @@ A web application that creates personalized analytics dashboards for Spotify use
 - Python 3.8+
 - Node.js 16+
 
+## Features
+
+- Spotify OAuth authentication
+- User profile display with follower count
+- Top Tracks (different time periods)
+- Top Artists with genres and statistics
+- Recently Played tracks with timestamps
+- Responsive design for mobile and desktop
+
 ## Setup Instructions
 
-1. Spotify API Setup
-   1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/)
-   2. Create a new app
-   3. Add `https://127.0.0.1:5000/callback/` to Redirect URIs in your dashboard
-   4. Save your `Client ID` and `Client Secret`
+### 1. Spotify API Setup
 
-2. Env Setup
-   1. Create environment file:
-      ```bash
-      cp .env.example .env
-      ```
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/)
+2. Create a new app
+3. Add `http://127.0.0.1:5000/callback/` to Redirect URIs in your dashboard settings
+4. Save your `Client ID` and `Client Secret`
+5. Adding any other users require manual set up in User Management tab
 
-   2. Edit `.env` with your Spotify credentials:
-      ```
-      SPOTIFY_CLIENT_ID=your_spotify_client_id_here
-      SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
-      ```
+### 2. Environment Setup
 
-3. Backend Setup
-   1. Navigate to the backend directory:
-      ```bash
-      cd backend
-      ```
+Create a `.env` file in the `backend` directory with your Spotify credentials:
 
-   2. Install Python dependencies:
-      ```bash
-      pip install -r requirements.txt
-      ```
+```bash
+cp .env.example .env
+```
 
-   3. Start the Flask server:
-      ```bash
-      python app.py
-      ```
+Input your client id and secret here
 
-4. Frontend Setup
-   1. Install Node.js dependencies:
-      ```bash
-      npm install
-      ```
+### 3. Backend Setup
 
-   2. Start the development server:
-      ```bash
-      npm run dev
-      ```
+```bash
+cd backend
+pip install -r requirements.txt
+```
 
-5. Visit https://127.0.0.1:5000
-6. Login to Spotify (doesn't have to match developer account)
-7. Redirects to web app with data dashboard!
+### 4. Frontend Setup
 
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### 5. Run the Application
+
+Start the Flask server (which serves both backend API and frontend):
+
+```bash
+cd backend
+python app.py
+```
+
+Visit `http://127.0.0.1:5000` in your browser and click "Connect with Spotify" to start!
+
+## Development Mode
+
+If you want to develop the frontend with hot-reload:
+
+1. In one terminal, start the backend:
+   ```bash
+   cd backend
+   python app.py
+   ```
+
+2. In another terminal, start the frontend dev server:
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+3. Visit the frontend dev server URL 
+
+Note: The Vite dev server proxies API requests to the backend at `http://127.0.0.1:5000`
+
+## Project Structure
+
+```
+SpotifyDashboard/
+├── backend/
+│   ├── app.py              # Flask server and API endpoints
+│   └── requirements.txt    # Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   │   ├── Login.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── UserProfile.jsx
+│   │   │   ├── TopTracks.jsx
+│   │   │   ├── TopArtists.jsx
+│   │   │   └── RecentTracks.jsx
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── dist/               # Built frontend (served by Flask)
+│   └── package.json
+└── README.md
+```
+
+## API Endpoints
+
+- `GET /` - Serves the React frontend
+- `GET /login` - Initiates Spotify OAuth flow
+- `GET /callback` or `GET /api/callback` - OAuth callback endpoint
+- `GET /api/auth-status` - Check if user is authenticated
+- `GET /api/user` - Get current user profile
+- `GET /api/top-tracks?time_range=medium_term&limit=50` - Get user's top tracks
+- `GET /api/top-artists?time_range=medium_term&limit=50` - Get user's top artists
+- `GET /api/recent-tracks?limit=50` - Get recently played tracks
+
+## Future Plans
+
+- Changing top limits (currently 20)
+- Adding recommendation API calls
+- Data dashboard with more statistics 
+   - Requires manual download via `https://www.spotify.com/us/account/privacy/`
+   - Requires additional wait time 
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GNU License - see the LICENSE file for details.
