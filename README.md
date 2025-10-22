@@ -2,7 +2,8 @@
 
 A web application that creates personalized analytics dashboards for Spotify users, showing their top songs, top artists, and other analytics.
 
-> ⚠️ This project is not affiliated with or endorsed by Spotify. It is for educational and personal use only.
+<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/7809075c-4f4e-423a-9bd2-7814e3350e13" />
+
 
 ## Tech Stack
 
@@ -136,9 +137,15 @@ SpotifyDashboard/
 
 - Changing top limits (currently 20)
 - Adding recommendation API calls
-- Data dashboard with more statistics 
+- Data dashboard with more statistics (e.g. total listening time)
    - Requires manual download via `https://www.spotify.com/us/account/privacy/`
-   - Requires additional wait time 
+   - Requires additional wait time
+
+## Disclaimer
+
+This project is not affiliated with or endorsed by Spotify. It is a personal project built using the [Spotify Web API](https://developer.spotify.com/documentation/web-api/).
+
+Spotify is a registered trademark of Spotify AB.
 
 ## License
 
