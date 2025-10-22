@@ -1,10 +1,13 @@
-# Spotify Dashboard
+# Music Dashboard
 
 A web application that creates personalized analytics dashboards for Spotify users, showing their top songs, top artists, and other analytics.
+
+> ⚠️ This project is not affiliated with or endorsed by Spotify. It is for educational and personal use only.
 
 ## Tech Stack
 
 ### Backend
+- **Spotify Web API**: https://developer.spotify.com/documentation/web-api/
 - **Python Flask**: Web server and API endpoints
 - **Spotipy**: Spotify Web API integration
 - **Pandas**: Data analysis and processing
